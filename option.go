@@ -8,8 +8,9 @@ import (
 )
 
 type innerOption struct {
-	FileMode os.FileMode
-	Options  *bbolt.Options
+	FileMode     os.FileMode
+	DefaultCoder Coder
+	Options      *bbolt.Options
 }
 
 // Options represents the options that can be set when opening a database.
@@ -19,6 +20,13 @@ type Option func(options *innerOption)
 func WithFileMode(fileMode os.FileMode) Option {
 	return func(options *innerOption) {
 		options.FileMode = fileMode
+	}
+}
+
+// WithDefaultCoder return Option with specified DefaultCoder
+func WithDefaultCoder(defaultCoder Coder) Option {
+	return func(options *innerOption) {
+		options.DefaultCoder = defaultCoder
 	}
 }
 

@@ -10,3 +10,8 @@ type Storable interface {
 type HasBucket interface {
 	Bucket() []byte
 }
+
+// HasCoder is the interface that indicates the Coder of the type
+type HasCoder interface {
+	Coder() Coder
+}

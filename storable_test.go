@@ -37,6 +37,10 @@ func (c *Car) Key() []byte {
 	return ret
 }
 
+func (c *Car) Coder() Coder {
+	return XmlCoder{}
+}
+
 type Wind struct {
 }
 
