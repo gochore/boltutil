@@ -11,7 +11,8 @@ import (
 
 func TestWithOption(t *testing.T) {
 	want := &innerOption{
-		FileMode: 0600,
+		FileMode:     0600,
+		DefaultCoder: XmlCoder{},
 		Options: &bbolt.Options{
 			Timeout:         time.Second,
 			NoGrowSync:      true,
@@ -28,6 +29,7 @@ func TestWithOption(t *testing.T) {
 
 	options := []Option{
 		WithFileMode(want.FileMode),
+		WithDefaultCoder(want.DefaultCoder),
 		WithTimeout(want.Options.Timeout),
 		WithNoGrowSync(want.Options.NoGrowSync),
 		WithNoFreelistSync(want.Options.NoFreelistSync),

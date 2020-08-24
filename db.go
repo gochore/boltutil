@@ -2,7 +2,6 @@ package boltutil
 
 import (
 	"bytes"
-	"encoding/gob"
 	"fmt"
 	"reflect"
 
@@ -10,13 +9,15 @@ import (
 )
 
 type DB struct {
-	db *bbolt.DB
+	db           *bbolt.DB
+	defaultCoder Coder
 }
 
 //  Open creates and opens a database with given options.
 func Open(path string, options ...Option) (*DB, error) {
 	option := &innerOption{
-		FileMode: 0600,
+		FileMode:     0600,
+		DefaultCoder: GobCoder{},
 		Options: func() *bbolt.Options {
 			v := *bbolt.DefaultOptions
 			return &v
@@ -32,7 +33,8 @@ func Open(path string, options ...Option) (*DB, error) {
 	}
 
 	return &DB{
-		db: db,
+		db:           db,
+		defaultCoder: option.DefaultCoder,
 	}, nil
 }
 
@@ -65,8 +67,7 @@ func (d *DB) Get(objs ...Storable) error {
 		if got == nil {
 			return ErrNotFound
 		}
-		dec := gob.NewDecoder(bytes.NewBuffer(got))
-		if err := dec.Decode(obj); err != nil {
+		if err := d.getCoder(obj).Decode(bytes.NewBuffer(got), obj); err != nil {
 			return fmt.Errorf("decode %T %q: %w", obj, obj.Key(), err)
 		}
 	}
@@ -97,8 +98,10 @@ func (d *DB) GetAll(result interface{}) error {
 	item := reflect.New(itemType).Interface()
 
 	var bucketName []byte
+	var coder Coder
 	if obj, ok := item.(Storable); ok {
 		bucketName = obj.Bucket()
+		coder = d.getCoder(obj)
 	} else {
 		return fmt.Errorf("item should implement Storable: %T", item)
 	}
@@ -117,8 +120,7 @@ func (d *DB) GetAll(result interface{}) error {
 	cur := bucket.Cursor()
 	for k, v := cur.First(); k != nil; k, v = cur.Next() {
 		obj := reflect.New(itemType).Interface()
-		dec := gob.NewDecoder(bytes.NewBuffer(v))
-		if err := dec.Decode(obj); err != nil {
+		if err := coder.Decode(bytes.NewBuffer(v), obj); err != nil {
 			return fmt.Errorf("decode %T %q: %w", obj, k, err)
 		}
 		slice.Set(reflect.Append(slice, reflect.ValueOf(obj)))
@@ -288,8 +290,7 @@ func (d *DB) Put(storables ...Storable) error {
 
 	for _, obj := range storables {
 		buffer := &bytes.Buffer{}
-		enc := gob.NewEncoder(buffer)
-		if err := enc.Encode(obj); err != nil {
+		if err := d.getCoder(obj).Encode(buffer, obj); err != nil {
 			return fmt.Errorf("encode %T %q: %w", obj, obj.Key(), err)
 		}
 
@@ -370,4 +371,11 @@ func (d *DB) FlushAll() error {
 
 func rollback(tx *bbolt.Tx) {
 	_ = tx.Rollback()
+}
+
+func (d *DB) getCoder(obj interface{}) Coder {
+	if v, ok := obj.(HasCoder); ok {
+		return v.Coder()
+	}
+	return d.defaultCoder
 }
