@@ -50,7 +50,7 @@ func (d *DB) Get(objs ...Storable) error {
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer rollback(tx)
 
 	for _, obj := range objs {
 		bucket := tx.Bucket(obj.Bucket())
@@ -95,7 +95,7 @@ func (d *DB) GetAll(result interface{}) error {
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer rollback(tx)
 
 	bucket := tx.Bucket(obj.Bucket())
 	if bucket == nil {
@@ -120,7 +120,8 @@ func (d *DB) Count(hasBucket HasBucket, count interface{}) error {
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer rollback(tx)
+
 	bucket := tx.Bucket(hasBucket.Bucket())
 
 	errNilCount := fmt.Errorf("nil count")
@@ -270,7 +271,7 @@ func (d *DB) Put(storables ...Storable) error {
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer rollback(tx)
 
 	for _, obj := range storables {
 		buffer := &bytes.Buffer{}
@@ -298,7 +299,7 @@ func (d *DB) Delete(storables ...Storable) error {
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer rollback(tx)
 
 	for _, obj := range storables {
 		bucket := tx.Bucket(obj.Bucket())
@@ -317,7 +318,7 @@ func (d *DB) Flush(hasBuckets ...HasBucket) error {
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer rollback(tx)
 
 	for _, obj := range hasBuckets {
 		bucket := tx.Bucket(obj.Bucket())
@@ -336,7 +337,7 @@ func (d *DB) FlushAll() error {
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer rollback(tx)
 
 	var buckets [][]byte
 	if err := tx.ForEach(func(name []byte, _ *bbolt.Bucket) error {
@@ -352,4 +353,8 @@ func (d *DB) FlushAll() error {
 		}
 	}
 	return tx.Commit()
+}
+
+func rollback(tx *bbolt.Tx) {
+	_ = tx.Rollback()
 }
