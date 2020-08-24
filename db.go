@@ -281,6 +281,7 @@ func (d *DB) Count(hasBucket HasBucket, count interface{}) error {
 	return nil
 }
 
+// Put store storables into database, create bucket if does not exists.
 func (d *DB) Put(storables ...Storable) error {
 	tx, err := d.db.Begin(true)
 	if err != nil {
@@ -308,6 +309,7 @@ func (d *DB) Put(storables ...Storable) error {
 	return tx.Commit()
 }
 
+// Delete remove values by key of storables
 func (d *DB) Delete(storables ...Storable) error {
 	tx, err := d.db.Begin(true)
 	if err != nil {
@@ -327,6 +329,7 @@ func (d *DB) Delete(storables ...Storable) error {
 	return tx.Commit()
 }
 
+// Flush remove the specified buckets
 func (d *DB) Flush(hasBuckets ...HasBucket) error {
 	tx, err := d.db.Begin(true)
 	if err != nil {
@@ -346,6 +349,7 @@ func (d *DB) Flush(hasBuckets ...HasBucket) error {
 	return tx.Commit()
 }
 
+// Flush remove all buckets
 func (d *DB) FlushAll() error {
 	tx, err := d.db.Begin(true)
 	if err != nil {

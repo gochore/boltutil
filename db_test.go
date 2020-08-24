@@ -10,8 +10,11 @@ import (
 	"go.etcd.io/bbolt"
 )
 
-func testDB(t *testing.T) *DB {
+func testDB(t *testing.T, empty ...bool) *DB {
 	db, _ := Open(filepath.Join(t.TempDir(), "bolt.db"))
+	if len(empty) > 0 && empty[0] {
+		return db
+	}
 	_ = db.Put(
 		&Person{
 			Id:   "jason",
@@ -477,6 +480,140 @@ func TestDB_Count(t *testing.T) {
 				if count := fmt.Sprintf("%v", reflect.ValueOf(tt.args.count).Elem().Interface()); count != "2" {
 					t.Errorf("Count() got %+v, want %v", count, 2)
 				}
+			}
+		})
+	}
+}
+
+func TestDB_Put(t *testing.T) {
+	type args struct {
+		storables []Storable
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantErr bool
+	}{
+		{
+			name: "regular",
+			args: args{
+				storables: []Storable{
+					&Person{
+						Id:   "hei",
+						Name: "Xiao Hei",
+						Age:  2,
+					},
+					&Car{
+						Id:        2,
+						Name:      "Ya Di",
+						CreatedAt: time.Now(),
+					},
+				},
+			},
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := testDB(t, true).Put(tt.args.storables...); (err != nil) != tt.wantErr {
+				t.Errorf("Put() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestDB_Delete(t *testing.T) {
+	type args struct {
+		storables []Storable
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantErr bool
+	}{
+		{
+			name: "regular",
+			args: args{
+				storables: []Storable{
+					&Person{
+						Id: "jason",
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "bucket not exists",
+			args: args{
+				storables: []Storable{
+					&Wind{},
+				},
+			},
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := testDB(t).Delete(tt.args.storables...); (err != nil) != tt.wantErr {
+				t.Errorf("Delete() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestDB_Flush(t *testing.T) {
+	type args struct {
+		hasBuckets []HasBucket
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantErr bool
+	}{
+		{
+			name: "regular",
+			args: args{
+				hasBuckets: []HasBucket{
+					&Person{
+						Id: "jason",
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "bucket not exists",
+			args: args{
+				hasBuckets: []HasBucket{
+					&Wind{},
+				},
+			},
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := testDB(t).Flush(tt.args.hasBuckets...); (err != nil) != tt.wantErr {
+				t.Errorf("Flush() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestDB_FlushAll(t *testing.T) {
+	tests := []struct {
+		name    string
+		wantErr bool
+	}{
+		{
+			name:    "regular",
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := testDB(t).FlushAll(); (err != nil) != tt.wantErr {
+				t.Errorf("FlushAll() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
