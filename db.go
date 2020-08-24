@@ -13,6 +13,7 @@ type DB struct {
 	db *bbolt.DB
 }
 
+//  Open creates and opens a database with given options.
 func Open(path string, options ...Option) (*DB, error) {
 	option := &innerOption{
 		FileMode: 0600,
@@ -35,16 +36,19 @@ func Open(path string, options ...Option) (*DB, error) {
 	}, nil
 }
 
+//  Wrap return a DB with then given bbolt.DB
 func Wrap(db *bbolt.DB) *DB {
 	return &DB{
 		db: db,
 	}
 }
 
+//  Unwrap return the original bbolt.DB
 func (d *DB) Unwrap() *bbolt.DB {
 	return d.db
 }
 
+// Get injects storable objects with their keys.
 func (d *DB) Get(objs ...Storable) error {
 	tx, err := d.db.Begin(false)
 	if err != nil {
@@ -63,32 +67,40 @@ func (d *DB) Get(objs ...Storable) error {
 		}
 		dec := gob.NewDecoder(bytes.NewBuffer(got))
 		if err := dec.Decode(obj); err != nil {
-			return fmt.Errorf("decode %T %s: %w", obj, obj.Key(), err)
+			return fmt.Errorf("decode %T %q: %w", obj, obj.Key(), err)
 		}
 	}
 
 	return nil
 }
 
+// GetAll injects all storable objects in the bucket.
 func (d *DB) GetAll(result interface{}) error {
 	if reflect.TypeOf(result).Kind() != reflect.Ptr {
 		return fmt.Errorf("should be slice pointer: %T", result)
 	}
 
-	resultSlice := reflect.ValueOf(result).Elem()
-	if resultSlice.Kind() != reflect.Slice {
+	slice := reflect.ValueOf(result).Elem()
+	if slice.Kind() != reflect.Slice {
 		return fmt.Errorf("should be slice pointer: %T", result)
 	}
 
-	if resultSlice.Len() != 0 {
-		return fmt.Errorf("should be empty: len %d", resultSlice.Len())
+	if slice.Len() != 0 {
+		return fmt.Errorf("should be empty: len %d", slice.Len())
 	}
 
-	itemType := reflect.TypeOf(resultSlice).Elem()
+	itemType := slice.Type().Elem()
+	if itemType.Kind() != reflect.Ptr {
+		return fmt.Errorf("item should be pointer: %v", itemType)
+	}
+	itemType = itemType.Elem()
 	item := reflect.New(itemType).Interface()
-	obj, ok := item.(Storable)
-	if !ok {
-		return fmt.Errorf("item should implement Storable: %T", obj)
+
+	var bucketName []byte
+	if obj, ok := item.(Storable); ok {
+		bucketName = obj.Bucket()
+	} else {
+		return fmt.Errorf("item should implement Storable: %T", item)
 	}
 
 	tx, err := d.db.Begin(false)
@@ -97,24 +109,25 @@ func (d *DB) GetAll(result interface{}) error {
 	}
 	defer rollback(tx)
 
-	bucket := tx.Bucket(obj.Bucket())
+	bucket := tx.Bucket(bucketName)
 	if bucket == nil {
 		return nil
 	}
 
 	cur := bucket.Cursor()
 	for k, v := cur.First(); k != nil; k, v = cur.Next() {
-		newObj := reflect.New(itemType).Interface()
+		obj := reflect.New(itemType).Interface()
 		dec := gob.NewDecoder(bytes.NewBuffer(v))
 		if err := dec.Decode(obj); err != nil {
-			return fmt.Errorf("decode %T %s: %w", newObj, k, err)
+			return fmt.Errorf("decode %T %q: %w", obj, k, err)
 		}
-		resultSlice.Set(reflect.Append(resultSlice, reflect.ValueOf(obj)))
+		slice.Set(reflect.Append(slice, reflect.ValueOf(obj)))
 	}
 
 	return nil
 }
 
+// GetAll injects count of keys in the bucket.
 func (d *DB) Count(hasBucket HasBucket, count interface{}) error {
 	tx, err := d.db.Begin(false)
 	if err != nil {
@@ -277,7 +290,7 @@ func (d *DB) Put(storables ...Storable) error {
 		buffer := &bytes.Buffer{}
 		enc := gob.NewEncoder(buffer)
 		if err := enc.Encode(obj); err != nil {
-			return fmt.Errorf("encode %T %s: %w", obj, obj.Key(), err)
+			return fmt.Errorf("encode %T %q: %w", obj, obj.Key(), err)
 		}
 
 		bucket := tx.Bucket(obj.Bucket())
