@@ -129,156 +129,25 @@ func (d *DB) GetAll(result interface{}) error {
 	return nil
 }
 
-// GetAll injects count of keys in the bucket.
-func (d *DB) Count(hasBucket HasBucket, count interface{}) error {
+// Count return count of kv in the bucket.
+func (d *DB) Count(hasBucket HasBucket) (int, error) {
 	tx, err := d.db.Begin(false)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	defer rollback(tx)
 
 	bucket := tx.Bucket(hasBucket.Bucket())
-
-	errNilCount := fmt.Errorf("nil count")
-
-	switch c := count.(type) {
-	case *uint8:
-		if c == nil {
-			return errNilCount
-		}
-		*c = 0
-		if bucket != nil {
-			return bucket.ForEach(func(_, _ []byte) error {
-				*c++
-				return nil
-			})
-		}
-	case *uint16:
-		if c == nil {
-			return errNilCount
-		}
-		*c = 0
-		if bucket != nil {
-			return bucket.ForEach(func(_, _ []byte) error {
-				*c++
-				return nil
-			})
-		}
-	case *uint32:
-		if c == nil {
-			return errNilCount
-		}
-		*c = 0
-		if bucket != nil {
-			return bucket.ForEach(func(_, _ []byte) error {
-				*c++
-				return nil
-			})
-		}
-	case *uint64:
-		if c == nil {
-			return errNilCount
-		}
-		*c = 0
-		if bucket != nil {
-			return bucket.ForEach(func(_, _ []byte) error {
-				*c++
-				return nil
-			})
-		}
-	case *int8:
-		if c == nil {
-			return errNilCount
-		}
-		*c = 0
-		if bucket != nil {
-			return bucket.ForEach(func(_, _ []byte) error {
-				*c++
-				return nil
-			})
-		}
-	case *int16:
-		if c == nil {
-			return errNilCount
-		}
-		*c = 0
-		if bucket != nil {
-			return bucket.ForEach(func(_, _ []byte) error {
-				*c++
-				return nil
-			})
-		}
-	case *int32:
-		if c == nil {
-			return errNilCount
-		}
-		*c = 0
-		if bucket != nil {
-			return bucket.ForEach(func(_, _ []byte) error {
-				*c++
-				return nil
-			})
-		}
-	case *int64:
-		if c == nil {
-			return errNilCount
-		}
-		*c = 0
-		if bucket != nil {
-			return bucket.ForEach(func(_, _ []byte) error {
-				*c++
-				return nil
-			})
-		}
-	case *float32:
-		if c == nil {
-			return errNilCount
-		}
-		*c = 0
-		if bucket != nil {
-			return bucket.ForEach(func(_, _ []byte) error {
-				*c++
-				return nil
-			})
-		}
-	case *float64:
-		if c == nil {
-			return errNilCount
-		}
-		*c = 0
-		if bucket != nil {
-			return bucket.ForEach(func(_, _ []byte) error {
-				*c++
-				return nil
-			})
-		}
-	case *int:
-		if c == nil {
-			return errNilCount
-		}
-		*c = 0
-		if bucket != nil {
-			return bucket.ForEach(func(_, _ []byte) error {
-				*c++
-				return nil
-			})
-		}
-	case *uint:
-		if c == nil {
-			return errNilCount
-		}
-		*c = 0
-		if bucket != nil {
-			return bucket.ForEach(func(_, _ []byte) error {
-				*c++
-				return nil
-			})
-		}
-	default:
-		return fmt.Errorf("should be number pointer: %T", count)
+	if bucket == nil {
+		return 0, nil
 	}
 
-	return nil
+	ret := 0
+	cur := bucket.Cursor()
+	for k, _ := cur.First(); k != nil; k, _ = cur.Next() {
+		ret++
+	}
+	return ret, nil
 }
 
 // Put store storables into database, create bucket if does not exists.
