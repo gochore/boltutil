@@ -561,7 +561,7 @@ func TestDB_Delete(t *testing.T) {
 	}
 }
 
-func TestDB_Flush(t *testing.T) {
+func TestDB_DeleteBucket(t *testing.T) {
 	type args struct {
 		hasBuckets []HasBucket
 	}
@@ -593,14 +593,14 @@ func TestDB_Flush(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := testDB(t).Flush(tt.args.hasBuckets...); (err != nil) != tt.wantErr {
-				t.Errorf("Flush() error = %v, wantErr %v", err, tt.wantErr)
+			if err := testDB(t).DeleteBucket(tt.args.hasBuckets...); (err != nil) != tt.wantErr {
+				t.Errorf("DeleteBucket() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
 }
 
-func TestDB_FlushAll(t *testing.T) {
+func TestDB_DeleteAllBucket(t *testing.T) {
 	tests := []struct {
 		name    string
 		wantErr bool
@@ -612,8 +612,8 @@ func TestDB_FlushAll(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := testDB(t).FlushAll(); (err != nil) != tt.wantErr {
-				t.Errorf("FlushAll() error = %v, wantErr %v", err, tt.wantErr)
+			if err := testDB(t).DeleteAllBucket(); (err != nil) != tt.wantErr {
+				t.Errorf("DeleteAllBucket() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}

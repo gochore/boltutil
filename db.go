@@ -329,8 +329,8 @@ func (d *DB) Delete(storables ...Storable) error {
 	return tx.Commit()
 }
 
-// Flush remove the specified buckets
-func (d *DB) Flush(hasBuckets ...HasBucket) error {
+// DeleteBucket remove the specified buckets
+func (d *DB) DeleteBucket(hasBuckets ...HasBucket) error {
 	tx, err := d.db.Begin(true)
 	if err != nil {
 		return err
@@ -349,8 +349,8 @@ func (d *DB) Flush(hasBuckets ...HasBucket) error {
 	return tx.Commit()
 }
 
-// Flush remove all buckets
-func (d *DB) FlushAll() error {
+// DeleteAllBucket remove all buckets
+func (d *DB) DeleteAllBucket() error {
 	tx, err := d.db.Begin(true)
 	if err != nil {
 		return err
