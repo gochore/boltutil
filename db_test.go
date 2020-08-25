@@ -1,7 +1,6 @@
 package boltutil
 
 import (
-	"fmt"
 	"path/filepath"
 	"reflect"
 	"testing"
@@ -304,187 +303,6 @@ func TestDB_GetAll(t *testing.T) {
 	}
 }
 
-func TestDB_Count(t *testing.T) {
-	type args struct {
-		hasBucket HasBucket
-		count     interface{}
-	}
-	tests := []struct {
-		name    string
-		args    args
-		wantErr bool
-	}{
-
-		{
-			name: "uint8",
-			args: args{
-				hasBucket: &Person{},
-				count: func() *uint8 {
-					var ret uint8
-					return &ret
-				}(),
-			},
-			wantErr: false,
-		},
-		{
-			name: "uint16",
-			args: args{
-				hasBucket: &Person{},
-				count: func() *uint16 {
-					var ret uint16
-					return &ret
-				}(),
-			},
-			wantErr: false,
-		},
-		{
-			name: "uint32",
-			args: args{
-				hasBucket: &Person{},
-				count: func() *uint32 {
-					var ret uint32
-					return &ret
-				}(),
-			},
-			wantErr: false,
-		},
-		{
-			name: "uint64",
-			args: args{
-				hasBucket: &Person{},
-				count: func() *uint64 {
-					var ret uint64
-					return &ret
-				}(),
-			},
-			wantErr: false,
-		},
-		{
-			name: "int8",
-			args: args{
-				hasBucket: &Person{},
-				count: func() *int8 {
-					var ret int8
-					return &ret
-				}(),
-			},
-			wantErr: false,
-		},
-		{
-			name: "int16",
-			args: args{
-				hasBucket: &Person{},
-				count: func() *int16 {
-					var ret int16
-					return &ret
-				}(),
-			},
-			wantErr: false,
-		},
-		{
-			name: "int32",
-			args: args{
-				hasBucket: &Person{},
-				count: func() *int32 {
-					var ret int32
-					return &ret
-				}(),
-			},
-			wantErr: false,
-		},
-		{
-			name: "int64",
-			args: args{
-				hasBucket: &Person{},
-				count: func() *int64 {
-					var ret int64
-					return &ret
-				}(),
-			},
-			wantErr: false,
-		},
-		{
-			name: "float32",
-			args: args{
-				hasBucket: &Person{},
-				count: func() *float32 {
-					var ret float32
-					return &ret
-				}(),
-			},
-			wantErr: false,
-		},
-		{
-			name: "float64",
-			args: args{
-				hasBucket: &Person{},
-				count: func() *float64 {
-					var ret float64
-					return &ret
-				}(),
-			},
-			wantErr: false,
-		},
-		{
-			name: "int",
-			args: args{
-				hasBucket: &Person{},
-				count: func() *int {
-					var ret int
-					return &ret
-				}(),
-			},
-			wantErr: false,
-		},
-		{
-			name: "uint",
-			args: args{
-				hasBucket: &Person{},
-				count: func() *uint {
-					var ret uint
-					return &ret
-				}(),
-			},
-			wantErr: false,
-		},
-		{
-			name: "nil",
-			args: args{
-				hasBucket: &Person{},
-				count:     nil,
-			},
-			wantErr: true,
-		},
-		{
-			name: "string",
-			args: args{
-				hasBucket: &Person{},
-				count:     "1",
-			},
-			wantErr: true,
-		},
-		{
-			name: "nil int",
-			args: args{
-				hasBucket: &Person{},
-				count:     (*int)(nil),
-			},
-			wantErr: true,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if err := testDB(t).Count(tt.args.hasBucket, tt.args.count); (err != nil) != tt.wantErr {
-				t.Errorf("Count() error = %v, wantErr %v", err, tt.wantErr)
-			} else if err == nil {
-				if count := fmt.Sprintf("%v", reflect.ValueOf(tt.args.count).Elem().Interface()); count != "2" {
-					t.Errorf("Count() got %+v, want %v", count, 2)
-				}
-			}
-		})
-	}
-}
-
 func TestDB_Put(t *testing.T) {
 	type args struct {
 		storables []Storable
@@ -561,7 +379,7 @@ func TestDB_Delete(t *testing.T) {
 	}
 }
 
-func TestDB_Flush(t *testing.T) {
+func TestDB_DeleteBucket(t *testing.T) {
 	type args struct {
 		hasBuckets []HasBucket
 	}
@@ -593,14 +411,14 @@ func TestDB_Flush(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := testDB(t).Flush(tt.args.hasBuckets...); (err != nil) != tt.wantErr {
-				t.Errorf("Flush() error = %v, wantErr %v", err, tt.wantErr)
+			if err := testDB(t).DeleteBucket(tt.args.hasBuckets...); (err != nil) != tt.wantErr {
+				t.Errorf("DeleteBucket() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
 }
 
-func TestDB_FlushAll(t *testing.T) {
+func TestDB_DeleteAllBucket(t *testing.T) {
 	tests := []struct {
 		name    string
 		wantErr bool
@@ -612,8 +430,49 @@ func TestDB_FlushAll(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := testDB(t).FlushAll(); (err != nil) != tt.wantErr {
-				t.Errorf("FlushAll() error = %v, wantErr %v", err, tt.wantErr)
+			if err := testDB(t).DeleteAllBucket(); (err != nil) != tt.wantErr {
+				t.Errorf("DeleteAllBucket() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestDB_Count(t *testing.T) {
+	type args struct {
+		hasBucket HasBucket
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    int
+		wantErr bool
+	}{
+		{
+			name: "regular",
+			args: args{
+				hasBucket: &Person{},
+			},
+			want:    2,
+			wantErr: false,
+		},
+		{
+			name: "bucket not exists",
+			args: args{
+				hasBucket: &Wind{},
+			},
+			want:    0,
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := testDB(t).Count(tt.args.hasBucket)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Count() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("Count() got = %v, want %v", got, tt.want)
 			}
 		})
 	}
