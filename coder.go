@@ -27,10 +27,15 @@ func (c GobCoder) Decode(reader io.Reader, v interface{}) error {
 
 // JsonCoder implements Coder with json
 type JsonCoder struct {
+	Intent bool
 }
 
 func (c JsonCoder) Encode(writer io.Writer, v interface{}) error {
-	return json.NewEncoder(writer).Encode(v)
+	enc := json.NewEncoder(writer)
+	if c.Intent {
+		enc.SetIndent("", "\t")
+	}
+	return enc.Encode(v)
 }
 
 func (c JsonCoder) Decode(reader io.Reader, v interface{}) error {
