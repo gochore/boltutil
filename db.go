@@ -45,6 +45,11 @@ func Wrap(db *bbolt.DB) *DB {
 	}
 }
 
+//  Close releases all database resources
+func (d *DB) Close() error {
+	return d.db.Close()
+}
+
 //  Unwrap return the original bbolt.DB
 func (d *DB) Unwrap() *bbolt.DB {
 	return d.db
