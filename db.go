@@ -76,7 +76,7 @@ func (d *DB) Get(objs ...Storable) error {
 }
 
 // GetAll injects all storable objects in the bucket.
-func (d *DB) GetAll(result interface{}) error {
+func (d *DB) GetAll(result any) error {
 	if reflect.TypeOf(result).Kind() != reflect.Ptr {
 		return fmt.Errorf("should be slice pointer: %T", result)
 	}
@@ -284,7 +284,7 @@ func rollback(tx *bbolt.Tx) {
 	_ = tx.Rollback()
 }
 
-func (d *DB) getCoder(obj interface{}) Coder {
+func (d *DB) getCoder(obj any) Coder {
 	if v, ok := obj.(HasCoder); ok {
 		return v.BoltCoder()
 	}

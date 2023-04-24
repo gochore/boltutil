@@ -212,7 +212,7 @@ func TestDB_Get(t *testing.T) {
 
 func TestDB_GetAll(t *testing.T) {
 	type args struct {
-		result interface{}
+		result any
 	}
 	tests := []struct {
 		name    string
@@ -222,7 +222,7 @@ func TestDB_GetAll(t *testing.T) {
 		{
 			name: "regular",
 			args: args{
-				result: func() interface{} {
+				result: func() any {
 					var ret []*Person
 					return &ret
 				}(),
@@ -246,7 +246,7 @@ func TestDB_GetAll(t *testing.T) {
 		{
 			name: "not empty",
 			args: args{
-				result: func() interface{} {
+				result: func() any {
 					ret := make([]*Person, 1)
 					return &ret
 				}(),
@@ -256,7 +256,7 @@ func TestDB_GetAll(t *testing.T) {
 		{
 			name: "wrong item",
 			args: args{
-				result: func() interface{} {
+				result: func() any {
 					var ret []Person
 					return &ret
 				}(),
@@ -266,7 +266,7 @@ func TestDB_GetAll(t *testing.T) {
 		{
 			name: "not storable",
 			args: args{
-				result: func() interface{} {
+				result: func() any {
 					var ret []*string
 					return &ret
 				}(),
@@ -276,7 +276,7 @@ func TestDB_GetAll(t *testing.T) {
 		{
 			name: "bucket not exists",
 			args: args{
-				result: func() interface{} {
+				result: func() any {
 					var ret []*Wind
 					return &ret
 				}(),
@@ -286,7 +286,7 @@ func TestDB_GetAll(t *testing.T) {
 		{
 			name: "can not decode",
 			args: args{
-				result: func() interface{} {
+				result: func() any {
 					var ret []*Car
 					return &ret
 				}(),

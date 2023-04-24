@@ -9,19 +9,19 @@ import (
 
 // Coder is the interface that can encode and decode data.
 type Coder interface {
-	Encode(writer io.Writer, v interface{}) error
-	Decode(reader io.Reader, v interface{}) error
+	Encode(writer io.Writer, v any) error
+	Decode(reader io.Reader, v any) error
 }
 
 // GobCoder implements Coder with gob
 type GobCoder struct {
 }
 
-func (c GobCoder) Encode(writer io.Writer, v interface{}) error {
+func (c GobCoder) Encode(writer io.Writer, v any) error {
 	return gob.NewEncoder(writer).Encode(v)
 }
 
-func (c GobCoder) Decode(reader io.Reader, v interface{}) error {
+func (c GobCoder) Decode(reader io.Reader, v any) error {
 	return gob.NewDecoder(reader).Decode(v)
 }
 
@@ -30,7 +30,7 @@ type JsonCoder struct {
 	Intent bool
 }
 
-func (c JsonCoder) Encode(writer io.Writer, v interface{}) error {
+func (c JsonCoder) Encode(writer io.Writer, v any) error {
 	enc := json.NewEncoder(writer)
 	if c.Intent {
 		enc.SetIndent("", "\t")
@@ -38,7 +38,7 @@ func (c JsonCoder) Encode(writer io.Writer, v interface{}) error {
 	return enc.Encode(v)
 }
 
-func (c JsonCoder) Decode(reader io.Reader, v interface{}) error {
+func (c JsonCoder) Decode(reader io.Reader, v any) error {
 	return json.NewDecoder(reader).Decode(v)
 }
 
@@ -46,10 +46,10 @@ func (c JsonCoder) Decode(reader io.Reader, v interface{}) error {
 type XmlCoder struct {
 }
 
-func (c XmlCoder) Encode(writer io.Writer, v interface{}) error {
+func (c XmlCoder) Encode(writer io.Writer, v any) error {
 	return xml.NewEncoder(writer).Encode(v)
 }
 
-func (c XmlCoder) Decode(reader io.Reader, v interface{}) error {
+func (c XmlCoder) Decode(reader io.Reader, v any) error {
 	return xml.NewDecoder(reader).Decode(v)
 }
