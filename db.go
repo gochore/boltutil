@@ -17,7 +17,7 @@ type DB struct {
 func Open(path string, options ...Option) (*DB, error) {
 	option := &innerOption{
 		FileMode:     0600,
-		DefaultCoder: GobCoder{},
+		DefaultCoder: JsonCoder{},
 		Options: func() *bbolt.Options {
 			v := *bbolt.DefaultOptions
 			return &v
