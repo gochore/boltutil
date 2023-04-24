@@ -258,6 +258,28 @@ func (d *DB) Exist(obj Storable) (bool, error) {
 	return got != nil, nil
 }
 
+// Scan scans the storable
+func (d *DB) Scan(obj Storable, start []byte, f func(obj Storable) bool) error {
+	tx, err := d.db.Begin(false)
+	if err != nil {
+		return err
+	}
+	defer rollback(tx)
+
+	c := tx.Bucket(obj.BoltBucket()).Cursor()
+
+	for k, v := c.Seek(start); k != nil; k, v = c.Next() {
+		if err := d.getCoder(obj).Decode(bytes.NewReader(v), obj); err != nil {
+			return fmt.Errorf("decode %T %q: %w", obj, k, err)
+		}
+		if f != nil && !f(obj) {
+			return nil
+		}
+	}
+
+	return nil
+}
+
 func rollback(tx *bbolt.Tx) {
 	_ = tx.Rollback()
 }
