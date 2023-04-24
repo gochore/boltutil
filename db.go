@@ -13,7 +13,7 @@ type DB struct {
 	defaultCoder Coder
 }
 
-//  Open creates and opens a database with given options.
+// Open creates and opens a database with given options.
 func Open(path string, options ...Option) (*DB, error) {
 	option := &innerOption{
 		FileMode:     0600,
@@ -38,14 +38,14 @@ func Open(path string, options ...Option) (*DB, error) {
 	}, nil
 }
 
-//  Wrap return a DB with then given bbolt.DB
+// Wrap return a DB with then given bbolt.DB
 func Wrap(db *bbolt.DB) *DB {
 	return &DB{
 		db: db,
 	}
 }
 
-//  Unwrap return the original bbolt.DB
+// Unwrap return the original bbolt.DB
 func (d *DB) Unwrap() *bbolt.DB {
 	return d.db
 }
@@ -59,16 +59,16 @@ func (d *DB) Get(objs ...Storable) error {
 	defer rollback(tx)
 
 	for _, obj := range objs {
-		bucket := tx.Bucket(obj.Bucket())
+		bucket := tx.Bucket(obj.BoltBucket())
 		if bucket == nil {
 			return ErrNotFound
 		}
-		got := bucket.Get(obj.Key())
+		got := bucket.Get(obj.BoltKey())
 		if got == nil {
 			return ErrNotFound
 		}
 		if err := d.getCoder(obj).Decode(bytes.NewBuffer(got), obj); err != nil {
-			return fmt.Errorf("decode %T %q: %w", obj, obj.Key(), err)
+			return fmt.Errorf("decode %T %q: %w", obj, obj.BoltKey(), err)
 		}
 	}
 
@@ -100,7 +100,7 @@ func (d *DB) GetAll(result interface{}) error {
 	var bucketName []byte
 	var coder Coder
 	if obj, ok := item.(Storable); ok {
-		bucketName = obj.Bucket()
+		bucketName = obj.BoltBucket()
 		coder = d.getCoder(obj)
 	} else {
 		return fmt.Errorf("item should implement Storable: %T", item)
@@ -137,7 +137,7 @@ func (d *DB) Count(hasBucket HasBucket) (int, error) {
 	}
 	defer rollback(tx)
 
-	bucket := tx.Bucket(hasBucket.Bucket())
+	bucket := tx.Bucket(hasBucket.BoltBucket())
 	if bucket == nil {
 		return 0, nil
 	}
@@ -161,16 +161,16 @@ func (d *DB) Put(storables ...Storable) error {
 	for _, obj := range storables {
 		buffer := &bytes.Buffer{}
 		if err := d.getCoder(obj).Encode(buffer, obj); err != nil {
-			return fmt.Errorf("encode %T %q: %w", obj, obj.Key(), err)
+			return fmt.Errorf("encode %T %q: %w", obj, obj.BoltKey(), err)
 		}
 
-		bucket := tx.Bucket(obj.Bucket())
+		bucket := tx.Bucket(obj.BoltBucket())
 		if bucket == nil {
-			if bucket, err = tx.CreateBucketIfNotExists(obj.Bucket()); err != nil {
+			if bucket, err = tx.CreateBucketIfNotExists(obj.BoltBucket()); err != nil {
 				return err
 			}
 		}
-		if err := bucket.Put(obj.Key(), buffer.Bytes()); err != nil {
+		if err := bucket.Put(obj.BoltKey(), buffer.Bytes()); err != nil {
 			return err
 		}
 	}
@@ -187,11 +187,11 @@ func (d *DB) Delete(storables ...Storable) error {
 	defer rollback(tx)
 
 	for _, obj := range storables {
-		bucket := tx.Bucket(obj.Bucket())
+		bucket := tx.Bucket(obj.BoltBucket())
 		if bucket == nil {
 			continue
 		}
-		if err := bucket.Delete(obj.Key()); err != nil {
+		if err := bucket.Delete(obj.BoltKey()); err != nil {
 			return err
 		}
 	}
@@ -207,11 +207,11 @@ func (d *DB) DeleteBucket(hasBuckets ...HasBucket) error {
 	defer rollback(tx)
 
 	for _, obj := range hasBuckets {
-		bucket := tx.Bucket(obj.Bucket())
+		bucket := tx.Bucket(obj.BoltBucket())
 		if bucket == nil {
 			continue
 		}
-		if err := tx.DeleteBucket(obj.Bucket()); err != nil {
+		if err := tx.DeleteBucket(obj.BoltBucket()); err != nil {
 			return nil
 		}
 	}
@@ -248,7 +248,7 @@ func rollback(tx *bbolt.Tx) {
 
 func (d *DB) getCoder(obj interface{}) Coder {
 	if v, ok := obj.(HasCoder); ok {
-		return v.Coder()
+		return v.BoltCoder()
 	}
 	return d.defaultCoder
 }

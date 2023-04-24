@@ -38,7 +38,7 @@ func testDB(t *testing.T, empty ...bool) *DB {
 		CreatedAt: time.Now(),
 	}
 	_ = db.Unwrap().Update(func(tx *bbolt.Tx) error {
-		return tx.Bucket(boom.Bucket()).Put(boom.Key(), []byte("can not decode"))
+		return tx.Bucket(boom.BoltBucket()).Put(boom.BoltKey(), []byte("can not decode"))
 	})
 	return db
 }

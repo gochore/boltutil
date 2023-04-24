@@ -13,7 +13,7 @@ type innerOption struct {
 	Options      *bbolt.Options
 }
 
-// Options represents the options that can be set when opening a database.
+// Option represents the options that can be set when opening a database.
 type Option func(options *innerOption)
 
 // WithFileMode return Option with specified FileMode
