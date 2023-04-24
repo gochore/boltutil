@@ -150,7 +150,7 @@ func (d *DB) Count(hasBucket HasBucket) (int, error) {
 	return ret, nil
 }
 
-// Put store storables into database, create bucket if does not exists.
+// Put store storables into database, create bucket if it does not exist.
 func (d *DB) Put(storables ...Storable) error {
 	tx, err := d.db.Begin(true)
 	if err != nil {
@@ -198,6 +198,44 @@ func (d *DB) Delete(storables ...Storable) error {
 	return tx.Commit()
 }
 
+// Exist check if the storable exist
+func (d *DB) Exist(obj Storable) (bool, error) {
+	tx, err := d.db.Begin(false)
+	if err != nil {
+		return false, err
+	}
+	defer rollback(tx)
+
+	bucket := tx.Bucket(obj.BoltBucket())
+	if bucket == nil {
+		return false, nil
+	}
+	got := bucket.Get(obj.BoltKey())
+	return got != nil, nil
+}
+
+// Scan scans the storable
+func (d *DB) Scan(obj Storable, start []byte, f func(obj Storable) bool) error {
+	tx, err := d.db.Begin(false)
+	if err != nil {
+		return err
+	}
+	defer rollback(tx)
+
+	c := tx.Bucket(obj.BoltBucket()).Cursor()
+
+	for k, v := c.Seek(start); k != nil; k, v = c.Next() {
+		if err := d.getCoder(obj).Decode(bytes.NewReader(v), obj); err != nil {
+			return fmt.Errorf("decode %T %q: %w", obj, k, err)
+		}
+		if f != nil && !f(obj) {
+			return nil
+		}
+	}
+
+	return nil
+}
+
 // DeleteBucket remove the specified buckets
 func (d *DB) DeleteBucket(hasBuckets ...HasBucket) error {
 	tx, err := d.db.Begin(true)
@@ -240,44 +278,6 @@ func (d *DB) DeleteAllBucket() error {
 		}
 	}
 	return tx.Commit()
-}
-
-// Exist check if the storable exist
-func (d *DB) Exist(obj Storable) (bool, error) {
-	tx, err := d.db.Begin(false)
-	if err != nil {
-		return false, err
-	}
-	defer rollback(tx)
-
-	bucket := tx.Bucket(obj.BoltBucket())
-	if bucket == nil {
-		return false, nil
-	}
-	got := bucket.Get(obj.BoltKey())
-	return got != nil, nil
-}
-
-// Scan scans the storable
-func (d *DB) Scan(obj Storable, start []byte, f func(obj Storable) bool) error {
-	tx, err := d.db.Begin(false)
-	if err != nil {
-		return err
-	}
-	defer rollback(tx)
-
-	c := tx.Bucket(obj.BoltBucket()).Cursor()
-
-	for k, v := c.Seek(start); k != nil; k, v = c.Next() {
-		if err := d.getCoder(obj).Decode(bytes.NewReader(v), obj); err != nil {
-			return fmt.Errorf("decode %T %q: %w", obj, k, err)
-		}
-		if f != nil && !f(obj) {
-			return nil
-		}
-	}
-
-	return nil
 }
 
 func rollback(tx *bbolt.Tx) {
