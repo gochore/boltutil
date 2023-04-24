@@ -242,6 +242,22 @@ func (d *DB) DeleteAllBucket() error {
 	return tx.Commit()
 }
 
+// Exist check if the storable exist
+func (d *DB) Exist(obj Storable) (bool, error) {
+	tx, err := d.db.Begin(false)
+	if err != nil {
+		return false, err
+	}
+	defer rollback(tx)
+
+	bucket := tx.Bucket(obj.BoltBucket())
+	if bucket == nil {
+		return false, nil
+	}
+	got := bucket.Get(obj.BoltKey())
+	return got != nil, nil
+}
+
 func rollback(tx *bbolt.Tx) {
 	_ = tx.Rollback()
 }
