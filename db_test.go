@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
 	"go.etcd.io/bbolt"
 )
 
@@ -38,7 +39,7 @@ func testDB(t *testing.T, empty ...bool) *DB {
 		CreatedAt: time.Now(),
 	}
 	_ = db.Unwrap().Update(func(tx *bbolt.Tx) error {
-		return tx.Bucket(boom.BoltBucket()).Put(boom.BoltKey(), []byte("can not decode"))
+		return tx.Bucket(boom.BoltBucket()).Put(boom.BoltKey(), []byte("dirty test data, can not be decoded"))
 	})
 	return db
 }
@@ -477,4 +478,22 @@ func TestDB_Count(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestDB_SetId(t *testing.T) {
+	t.Run("set id", func(t *testing.T) {
+		db := testDB(t, true)
+		require.NoError(t, db.Put(&Car{
+			Id:        0,
+			Name:      "test",
+			CreatedAt: time.Now(),
+		}))
+		car := &Car{
+			Id: 1,
+		}
+		require.NoError(t, db.Get(car))
+		require.Equal(t, uint32(1), car.Id)
+		require.Equal(t, "test", car.Name)
+
+	})
 }

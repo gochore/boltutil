@@ -15,3 +15,8 @@ type HasBucket interface {
 type HasCoder interface {
 	BoltCoder() Coder
 }
+
+// IdSettable is the interface that indicates the id can be set
+type IdSettable interface {
+	SetId(id uint64)
+}
