@@ -61,11 +61,11 @@ func (d *DB) MGet(objs ...Storable) error {
 	for _, obj := range objs {
 		bucket := tx.Bucket(obj.BoltBucket())
 		if bucket == nil {
-			return ErrNotFound
+			return ErrNotExist
 		}
 		got := bucket.Get(obj.BoltKey())
 		if got == nil {
-			return ErrNotFound
+			return ErrNotExist
 		}
 		if err := d.getCoder(obj).Decode(bytes.NewReader(got), obj); err != nil {
 			return fmt.Errorf("decode %T %q: %w", obj, obj.BoltKey(), err)
@@ -282,7 +282,7 @@ SCAN:
 		}
 		return nil
 	}
-	return ErrNotFound
+	return ErrNotExist
 }
 
 // Count return count of kv in the bucket.

@@ -3,5 +3,6 @@ package boltutil
 import "errors"
 
 var (
-	ErrNotFound = errors.New("not found")
+	ErrNotExist     = errors.New("not exist")
+	ErrAlreadyExist = errors.New("already exist")
 )

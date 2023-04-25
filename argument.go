@@ -83,3 +83,52 @@ func (c *Filter) getStorableConditions() []func(obj Storable) (skip bool, stop b
 	}
 	return c.storableFilters
 }
+
+type Condition struct {
+	ignoreIfExist bool // for Put
+	failIfExist   bool // for Put
+
+	ignoreIfNotExist bool // for Get
+
+	failIfNotExist bool // for Delete
+}
+
+func NewCondition() *Condition {
+	return &Condition{}
+}
+
+func (c *Condition) IgnoreIfExist(v ...bool) *Condition {
+	if len(v) == 0 {
+		c.ignoreIfExist = true
+	} else {
+		c.ignoreIfExist = v[0]
+	}
+	return c
+}
+
+func (c *Condition) FailIfExist(v ...bool) *Condition {
+	if len(v) == 0 {
+		c.failIfExist = true
+	} else {
+		c.failIfExist = v[0]
+	}
+	return c
+}
+
+func (c *Condition) IgnoreIfNotExist(v ...bool) *Condition {
+	if len(v) == 0 {
+		c.ignoreIfNotExist = true
+	} else {
+		c.ignoreIfNotExist = v[0]
+	}
+	return c
+}
+
+func (c *Condition) FailIfNotExist(v ...bool) *Condition {
+	if len(v) == 0 {
+		c.failIfNotExist = true
+	} else {
+		c.failIfNotExist = v[0]
+	}
+	return c
+}
