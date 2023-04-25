@@ -136,12 +136,12 @@ func (d *DB) MDelete(objs ...Storable) error {
 }
 
 // Scan scans values in the bucket and put them into result.
-func (d *DB) Scan(result any, condition ...*Condition) error {
-	var cond *Condition
-	if len(condition) == 1 {
-		cond = condition[0]
-	} else if len(condition) > 1 {
-		return fmt.Errorf("too many conditions")
+func (d *DB) Scan(result any, filters ...*Filter) error {
+	var filter *Filter
+	if len(filters) == 1 {
+		filter = filters[0]
+	} else if len(filters) > 1 {
+		return fmt.Errorf("too many filters")
 	}
 
 	if reflect.TypeOf(result).Kind() != reflect.Ptr {
@@ -185,12 +185,12 @@ func (d *DB) Scan(result any, condition ...*Condition) error {
 	}
 
 	cur := bucket.Cursor()
-	if seek := cond.seek(); seek != nil {
+	if seek := filter.seek(); seek != nil {
 		cur.Seek(seek)
 	}
 SCAN:
-	for k, v := cur.First(); cond.goon(k); k, v = cur.Next() {
-		for _, c := range cond.getConditions() {
+	for k, v := cur.First(); filter.goon(k); k, v = cur.Next() {
+		for _, c := range filter.getConditions() {
 			if c == nil {
 				continue
 			}
@@ -208,7 +208,7 @@ SCAN:
 			return fmt.Errorf("decode %T %q: %w", obj, k, err)
 		}
 
-		for _, c := range cond.getStorableConditions() {
+		for _, c := range filter.getStorableConditions() {
 			if c == nil {
 				continue
 			}
@@ -228,12 +228,12 @@ SCAN:
 }
 
 // First injects the first value in the bucket into result.
-func (d *DB) First(obj Storable, condition ...*Condition) error {
-	var cond *Condition
-	if len(condition) == 1 {
-		cond = condition[0]
-	} else if len(condition) > 1 {
-		return fmt.Errorf("too many conditions")
+func (d *DB) First(obj Storable, filters ...*Filter) error {
+	var filter *Filter
+	if len(filters) == 1 {
+		filter = filters[0]
+	} else if len(filters) > 1 {
+		return fmt.Errorf("too many filters")
 	}
 
 	tx, err := d.db.Begin(false)
@@ -248,12 +248,12 @@ func (d *DB) First(obj Storable, condition ...*Condition) error {
 	}
 
 	cur := bucket.Cursor()
-	if seek := cond.seek(); seek != nil {
+	if seek := filter.seek(); seek != nil {
 		cur.Seek(seek)
 	}
 SCAN:
-	for k, v := cur.First(); cond.goon(k); k, v = cur.Next() {
-		for _, c := range cond.getConditions() {
+	for k, v := cur.First(); filter.goon(k); k, v = cur.Next() {
+		for _, c := range filter.getConditions() {
 			if c == nil {
 				continue
 			}
@@ -268,7 +268,7 @@ SCAN:
 		if err := d.getCoder(obj).Decode(bytes.NewReader(v), obj); err != nil {
 			return fmt.Errorf("decode %T %q: %w", obj, k, err)
 		}
-		for _, c := range cond.getStorableConditions() {
+		for _, c := range filter.getStorableConditions() {
 			if c == nil {
 				continue
 			}
@@ -286,12 +286,12 @@ SCAN:
 }
 
 // Count return count of kv in the bucket.
-func (d *DB) Count(obj Storable, condition ...*Condition) (int, error) {
-	var cond *Condition
-	if len(condition) == 1 {
-		cond = condition[0]
-	} else if len(condition) > 1 {
-		return 0, fmt.Errorf("too many conditions")
+func (d *DB) Count(obj Storable, filters ...*Filter) (int, error) {
+	var filter *Filter
+	if len(filters) == 1 {
+		filter = filters[0]
+	} else if len(filters) > 1 {
+		return 0, fmt.Errorf("too many filters")
 	}
 
 	tx, err := d.db.Begin(false)
@@ -307,12 +307,12 @@ func (d *DB) Count(obj Storable, condition ...*Condition) (int, error) {
 
 	count := 0
 	cur := bucket.Cursor()
-	if seek := cond.seek(); seek != nil {
+	if seek := filter.seek(); seek != nil {
 		cur.Seek(seek)
 	}
 SCAN:
-	for k, v := cur.First(); cond.goon(k); k, v = cur.Next() {
-		for _, c := range cond.getConditions() {
+	for k, v := cur.First(); filter.goon(k); k, v = cur.Next() {
+		for _, c := range filter.getConditions() {
 			if c == nil {
 				continue
 			}
@@ -324,11 +324,11 @@ SCAN:
 				continue SCAN
 			}
 		}
-		if len(cond.getStorableConditions()) > 0 {
+		if len(filter.getStorableConditions()) > 0 {
 			if err := d.getCoder(obj).Decode(bytes.NewReader(v), obj); err != nil {
 				return 0, fmt.Errorf("decode %T %q: %w", obj, k, err)
 			}
-			for _, c := range cond.getStorableConditions() {
+			for _, c := range filter.getStorableConditions() {
 				if c == nil {
 					continue
 				}

@@ -214,7 +214,7 @@ func TestDB_Get(t *testing.T) {
 func TestDB_Scan(t *testing.T) {
 	type args struct {
 		result any
-		cond   *Condition
+		cond   *Filter
 	}
 	tests := []struct {
 		name    string
