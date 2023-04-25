@@ -124,7 +124,7 @@ func (d *DB) Delete(objs ...Storable) error {
 }
 
 // Scan scans values in the bucket and put them into result.
-func (d *DB) Scan(prefixOrRange any, result any) error {
+func (d *DB) Scan(result any, cond *Condition) error {
 	if reflect.TypeOf(result).Kind() != reflect.Ptr {
 		return fmt.Errorf("should be slice pointer: %T", result)
 	}
@@ -154,26 +154,6 @@ func (d *DB) Scan(prefixOrRange any, result any) error {
 		return fmt.Errorf("item should implement Storable: %T", item)
 	}
 
-	var (
-		min []byte
-		check func([]byte) bool
-	)
-	if key, ok := getKey(prefixOrRange); ok {
-		min = key
-		check = func(k []byte) bool {
-			return bytes.HasPrefix(k, min)
-		}
-	} else r, ok := prefixOrRange.(Range); ok {
-		min = r.Min
-		max := r.Max
-		check = func(k []byte) bool {
-			return bytes.Compare(k, min) >= 0 && bytes.Compare(k, max) < 0
-		}
-	}
-
-	}
-
-
 	tx, err := d.db.Begin(false)
 	if err != nil {
 		return err
@@ -186,20 +166,101 @@ func (d *DB) Scan(prefixOrRange any, result any) error {
 	}
 
 	cur := bucket.Cursor()
-	cur.Seek(prefix)
-	for k, v := cur.First(); k != nil && bytes.HasPrefix(k, prefix); k, v = cur.Next() {
+	if seek := cond.seek(); seek != nil {
+		cur.Seek(seek)
+	}
+SCAN:
+	for k, v := cur.First(); cond.goon(k); k, v = cur.Next() {
+		for _, c := range cond.conditions {
+			if c == nil {
+				continue
+			}
+			skip, stop := c(k, v)
+			if stop {
+				break SCAN
+			}
+			if skip {
+				continue SCAN
+			}
+		}
+
 		obj := reflect.New(itemType).Interface()
 		if err := coder.Decode(bytes.NewBuffer(v), obj); err != nil {
 			return fmt.Errorf("decode %T %q: %w", obj, k, err)
 		}
+
+		for _, c := range cond.storableConditions {
+			if c == nil {
+				continue
+			}
+			skip, stop := c(obj.(Storable))
+			if stop {
+				break SCAN
+			}
+			if skip {
+				continue SCAN
+			}
+		}
+
 		slice.Set(reflect.Append(slice, reflect.ValueOf(obj)))
 	}
 
 	return nil
 }
 
+// First injects the first value in the bucket into result.
+func (d *DB) First(obj Storable, cond *Condition) error {
+	tx, err := d.db.Begin(false)
+	if err != nil {
+		return err
+	}
+	defer rollback(tx)
+
+	bucket := tx.Bucket(obj.BoltBucket())
+	if bucket == nil {
+		return nil
+	}
+
+	cur := bucket.Cursor()
+	if seek := cond.seek(); seek != nil {
+		cur.Seek(seek)
+	}
+SCAN:
+	for k, v := cur.First(); cond.goon(k); k, v = cur.Next() {
+		for _, c := range cond.conditions {
+			if c == nil {
+				continue
+			}
+			skip, stop := c(k, v)
+			if stop {
+				break SCAN
+			}
+			if skip {
+				continue SCAN
+			}
+		}
+		if err := d.getCoder(obj).Decode(bytes.NewBuffer(v), obj); err != nil {
+			return fmt.Errorf("decode %T %q: %w", obj, k, err)
+		}
+		for _, c := range cond.storableConditions {
+			if c == nil {
+				continue
+			}
+			skip, stop := c(obj)
+			if stop {
+				break SCAN
+			}
+			if skip {
+				continue SCAN
+			}
+		}
+		return nil
+	}
+	return ErrNotFound
+}
+
 // Count return count of kv in the bucket.
-func (d *DB) Count(obj HasBucket) (int, error) {
+func (d *DB) Count(obj Storable, cond *Condition) (int, error) {
 	tx, err := d.db.Begin(false)
 	if err != nil {
 		return 0, err
@@ -211,12 +272,45 @@ func (d *DB) Count(obj HasBucket) (int, error) {
 		return 0, nil
 	}
 
-	ret := 0
+	count := 0
 	cur := bucket.Cursor()
-	for k, _ := cur.First(); k != nil; k, _ = cur.Next() {
-		ret++
+	if seek := cond.seek(); seek != nil {
+		cur.Seek(seek)
 	}
-	return ret, nil
+SCAN:
+	for k, v := cur.First(); cond.goon(k); k, v = cur.Next() {
+		for _, c := range cond.conditions {
+			if c == nil {
+				continue
+			}
+			skip, stop := c(k, v)
+			if stop {
+				break SCAN
+			}
+			if skip {
+				continue SCAN
+			}
+		}
+		if len(cond.storableConditions) > 0 {
+			if err := d.getCoder(obj).Decode(bytes.NewBuffer(v), obj); err != nil {
+				return 0, fmt.Errorf("decode %T %q: %w", obj, k, err)
+			}
+			for _, c := range cond.storableConditions {
+				if c == nil {
+					continue
+				}
+				skip, stop := c(obj)
+				if stop {
+					break SCAN
+				}
+				if skip {
+					continue SCAN
+				}
+			}
+		}
+		count++
+	}
+	return count, nil
 }
 
 // Exist check if the storable exist
