@@ -89,8 +89,7 @@ type Condition struct {
 	failIfExist   bool // for Put
 
 	ignoreIfNotExist bool // for Get
-
-	failIfNotExist bool // for Delete
+	failIfNotExist   bool // for Put, Delete
 }
 
 func NewCondition() *Condition {
@@ -131,4 +130,32 @@ func (c *Condition) FailIfNotExist(v ...bool) *Condition {
 		c.failIfNotExist = v[0]
 	}
 	return c
+}
+
+func (c *Condition) getIgnoreIfExist() bool {
+	if c == nil {
+		return false
+	}
+	return c.ignoreIfExist
+}
+
+func (c *Condition) getFailIfExist() bool {
+	if c == nil {
+		return false
+	}
+	return c.failIfExist
+}
+
+func (c *Condition) getIgnoreIfNotExist() bool {
+	if c == nil {
+		return false
+	}
+	return c.ignoreIfNotExist
+}
+
+func (c *Condition) getFailIfNotExist() bool {
+	if c == nil {
+		return false
+	}
+	return c.failIfNotExist
 }

@@ -50,6 +50,134 @@ func (d *DB) Unwrap() *bbolt.DB {
 	return d.db
 }
 
+// Close closes the database.
+func (d *DB) Close() error {
+	return d.db.Close()
+}
+
+// Get injects storable object with its key.
+func (d *DB) Get(obj Storable, conditions ...*Condition) error {
+	var condition *Condition
+	if len(conditions) == 1 {
+		condition = conditions[0]
+	} else if len(conditions) > 1 {
+		return fmt.Errorf("too many conditions")
+	}
+
+	tx, err := d.db.Begin(false)
+	if err != nil {
+		return err
+	}
+	defer rollback(tx)
+
+	bucket := tx.Bucket(obj.BoltBucket())
+	if bucket == nil {
+		if condition.getIgnoreIfNotExist() {
+			return nil
+		}
+		return ErrNotExist
+	}
+	got := bucket.Get(obj.BoltKey())
+	if got == nil {
+		if condition.getIgnoreIfNotExist() {
+			return nil
+		}
+		return ErrNotExist
+	}
+	if err := d.getCoder(obj).Decode(bytes.NewReader(got), obj); err != nil {
+		return fmt.Errorf("decode %T %q: %w", obj, obj.BoltKey(), err)
+	}
+
+	return nil
+}
+
+// Put stores storable object.
+func (d *DB) Put(obj Storable, conditions ...*Condition) error {
+	var condition *Condition
+	if len(conditions) == 1 {
+		condition = conditions[0]
+	} else if len(conditions) > 1 {
+		return fmt.Errorf("too many conditions")
+	}
+
+	tx, err := d.db.Begin(true)
+	if err != nil {
+		return err
+	}
+	defer rollback(tx)
+
+	bucket := tx.Bucket(obj.BoltBucket())
+	if bucket == nil {
+		if condition.getFailIfNotExist() {
+			return ErrNotExist
+		}
+		if bucket, err = tx.CreateBucketIfNotExists(obj.BoltBucket()); err != nil {
+			return err
+		}
+	}
+
+	if v, ok := obj.(IdSettable); ok {
+		id, err := bucket.NextSequence()
+		if err != nil {
+			return err
+		}
+		v.SetId(id)
+	}
+
+	if condition.getIgnoreIfExist() || condition.getFailIfExist() || condition.getFailIfNotExist() {
+		got := bucket.Get(obj.BoltKey())
+		if got != nil {
+			if condition.getIgnoreIfExist() {
+				return nil
+			}
+			if condition.getFailIfExist() {
+				return ErrAlreadyExist
+			}
+		} else if condition.getFailIfNotExist() {
+			return ErrNotExist
+		}
+	}
+
+	buffer := &bytes.Buffer{}
+	if err := d.getCoder(obj).Encode(buffer, obj); err != nil {
+		return fmt.Errorf("encode %T %q: %w", obj, obj.BoltKey(), err)
+	}
+
+	if err := bucket.Put(obj.BoltKey(), buffer.Bytes()); err != nil {
+		return err
+	}
+
+	return tx.Commit()
+}
+
+// Delete deletes storable object.
+func (d *DB) Delete(obj Storable, conditions ...*Condition) error {
+	var condition *Condition
+	if len(conditions) == 1 {
+		condition = conditions[0]
+	} else if len(conditions) > 1 {
+		return fmt.Errorf("too many conditions")
+	}
+
+	tx, err := d.db.Begin(true)
+	if err != nil {
+		return err
+	}
+	defer rollback(tx)
+
+	bucket := tx.Bucket(obj.BoltBucket())
+	if bucket == nil {
+		if condition.getFailIfNotExist() {
+			return ErrNotExist
+		}
+		return nil
+	}
+	if err := bucket.Delete(obj.BoltKey()); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
 // MGet injects storable objects with their keys.
 func (d *DB) MGet(objs ...Storable) error {
 	tx, err := d.db.Begin(false)
