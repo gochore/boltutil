@@ -16,7 +16,7 @@ type HasCoder interface {
 	BoltCoder() Coder
 }
 
-// IdSettable is the interface that indicates the id can be set
-type IdSettable interface {
-	SetId(id uint64)
+// HasBeforePut is the interface that indicates the BeforePut method
+type HasBeforePut interface {
+	BeforePut(id uint64) // will be called before put, id is an auto incrementing integer for the bucket
 }

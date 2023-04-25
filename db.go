@@ -116,14 +116,6 @@ func (d *DB) Put(obj Storable, conditions ...*Condition) error {
 		}
 	}
 
-	if v, ok := obj.(IdSettable); ok {
-		id, err := bucket.NextSequence()
-		if err != nil {
-			return err
-		}
-		v.SetId(id)
-	}
-
 	if condition.getIgnoreIfExist() || condition.getFailIfExist() || condition.getFailIfNotExist() {
 		got := bucket.Get(obj.BoltKey())
 		if got != nil {
@@ -136,6 +128,14 @@ func (d *DB) Put(obj Storable, conditions ...*Condition) error {
 		} else if condition.getFailIfNotExist() {
 			return ErrNotExist
 		}
+	}
+
+	if v, ok := obj.(HasBeforePut); ok {
+		id, err := bucket.NextSequence()
+		if err != nil {
+			return err
+		}
+		v.BeforePut(id)
 	}
 
 	buffer := &bytes.Buffer{}
@@ -220,12 +220,12 @@ func (d *DB) MPut(objs ...Storable) error {
 			}
 		}
 
-		if v, ok := obj.(IdSettable); ok {
+		if v, ok := obj.(HasBeforePut); ok {
 			id, err := bucket.NextSequence()
 			if err != nil {
 				return err
 			}
-			v.SetId(id)
+			v.BeforePut(id)
 		}
 
 		buffer.Reset()
