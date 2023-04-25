@@ -210,9 +210,10 @@ func TestDB_Get(t *testing.T) {
 	}
 }
 
-func TestDB_GetAll(t *testing.T) {
+func TestDB_Scan(t *testing.T) {
 	type args struct {
 		result any
+		cond   *Condition
 	}
 	tests := []struct {
 		name    string
@@ -296,8 +297,8 @@ func TestDB_GetAll(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := testDB(t).GetAll(tt.args.result); (err != nil) != tt.wantErr {
-				t.Errorf("GetAll() error = %v, wantErr %v", err, tt.wantErr)
+			if err := testDB(t).Scan(tt.args.result, tt.args.cond); (err != nil) != tt.wantErr {
+				t.Errorf("Scan() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
@@ -439,7 +440,7 @@ func TestDB_DeleteAllBucket(t *testing.T) {
 
 func TestDB_Count(t *testing.T) {
 	type args struct {
-		hasBucket HasBucket
+		obj Storable
 	}
 	tests := []struct {
 		name    string
@@ -450,7 +451,7 @@ func TestDB_Count(t *testing.T) {
 		{
 			name: "regular",
 			args: args{
-				hasBucket: &Person{},
+				obj: &Person{},
 			},
 			want:    2,
 			wantErr: false,
@@ -458,7 +459,7 @@ func TestDB_Count(t *testing.T) {
 		{
 			name: "bucket not exists",
 			args: args{
-				hasBucket: &Wind{},
+				obj: &Wind{},
 			},
 			want:    0,
 			wantErr: false,
@@ -466,7 +467,7 @@ func TestDB_Count(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := testDB(t).Count(tt.args.hasBucket)
+			got, err := testDB(t).Count(tt.args.obj, nil)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Count() error = %v, wantErr %v", err, tt.wantErr)
 				return

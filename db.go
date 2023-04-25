@@ -171,7 +171,7 @@ func (d *DB) Scan(result any, cond *Condition) error {
 	}
 SCAN:
 	for k, v := cur.First(); cond.goon(k); k, v = cur.Next() {
-		for _, c := range cond.conditions {
+		for _, c := range cond.getConditions() {
 			if c == nil {
 				continue
 			}
@@ -189,7 +189,7 @@ SCAN:
 			return fmt.Errorf("decode %T %q: %w", obj, k, err)
 		}
 
-		for _, c := range cond.storableConditions {
+		for _, c := range cond.getStorableConditions() {
 			if c == nil {
 				continue
 			}
@@ -227,7 +227,7 @@ func (d *DB) First(obj Storable, cond *Condition) error {
 	}
 SCAN:
 	for k, v := cur.First(); cond.goon(k); k, v = cur.Next() {
-		for _, c := range cond.conditions {
+		for _, c := range cond.getConditions() {
 			if c == nil {
 				continue
 			}
@@ -242,7 +242,7 @@ SCAN:
 		if err := d.getCoder(obj).Decode(bytes.NewBuffer(v), obj); err != nil {
 			return fmt.Errorf("decode %T %q: %w", obj, k, err)
 		}
-		for _, c := range cond.storableConditions {
+		for _, c := range cond.getStorableConditions() {
 			if c == nil {
 				continue
 			}
@@ -279,7 +279,7 @@ func (d *DB) Count(obj Storable, cond *Condition) (int, error) {
 	}
 SCAN:
 	for k, v := cur.First(); cond.goon(k); k, v = cur.Next() {
-		for _, c := range cond.conditions {
+		for _, c := range cond.getConditions() {
 			if c == nil {
 				continue
 			}
@@ -291,11 +291,11 @@ SCAN:
 				continue SCAN
 			}
 		}
-		if len(cond.storableConditions) > 0 {
+		if len(cond.getStorableConditions()) > 0 {
 			if err := d.getCoder(obj).Decode(bytes.NewBuffer(v), obj); err != nil {
 				return 0, fmt.Errorf("decode %T %q: %w", obj, k, err)
 			}
-			for _, c := range cond.storableConditions {
+			for _, c := range cond.getStorableConditions() {
 				if c == nil {
 					continue
 				}

@@ -69,3 +69,17 @@ func (c *Condition) goon(k []byte) bool {
 	}
 	return true
 }
+
+func (c *Condition) getConditions() []func(k, v []byte) (skip bool, stop bool) {
+	if c == nil {
+		return nil
+	}
+	return c.conditions
+}
+
+func (c *Condition) getStorableConditions() []func(obj Storable) (skip bool, stop bool) {
+	if c == nil {
+		return nil
+	}
+	return c.storableConditions
+}
