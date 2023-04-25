@@ -50,8 +50,136 @@ func (d *DB) Unwrap() *bbolt.DB {
 	return d.db
 }
 
-// Get injects storable objects with their keys.
-func (d *DB) Get(objs ...Storable) error {
+// Close closes the database.
+func (d *DB) Close() error {
+	return d.db.Close()
+}
+
+// Get injects storable object with its key.
+func (d *DB) Get(obj Storable, conditions ...*Condition) error {
+	var condition *Condition
+	if len(conditions) == 1 {
+		condition = conditions[0]
+	} else if len(conditions) > 1 {
+		return fmt.Errorf("too many conditions")
+	}
+
+	tx, err := d.db.Begin(false)
+	if err != nil {
+		return err
+	}
+	defer rollback(tx)
+
+	bucket := tx.Bucket(obj.BoltBucket())
+	if bucket == nil {
+		if condition.getIgnoreIfNotExist() {
+			return nil
+		}
+		return ErrNotExist
+	}
+	got := bucket.Get(obj.BoltKey())
+	if got == nil {
+		if condition.getIgnoreIfNotExist() {
+			return nil
+		}
+		return ErrNotExist
+	}
+	if err := d.getCoder(obj).Decode(bytes.NewReader(got), obj); err != nil {
+		return fmt.Errorf("decode %T %q: %w", obj, obj.BoltKey(), err)
+	}
+
+	return nil
+}
+
+// Put stores storable object.
+func (d *DB) Put(obj Storable, conditions ...*Condition) error {
+	var condition *Condition
+	if len(conditions) == 1 {
+		condition = conditions[0]
+	} else if len(conditions) > 1 {
+		return fmt.Errorf("too many conditions")
+	}
+
+	tx, err := d.db.Begin(true)
+	if err != nil {
+		return err
+	}
+	defer rollback(tx)
+
+	bucket := tx.Bucket(obj.BoltBucket())
+	if bucket == nil {
+		if condition.getFailIfNotExist() {
+			return ErrNotExist
+		}
+		if bucket, err = tx.CreateBucketIfNotExists(obj.BoltBucket()); err != nil {
+			return err
+		}
+	}
+
+	if condition.getIgnoreIfExist() || condition.getFailIfExist() || condition.getFailIfNotExist() {
+		got := bucket.Get(obj.BoltKey())
+		if got != nil {
+			if condition.getIgnoreIfExist() {
+				return nil
+			}
+			if condition.getFailIfExist() {
+				return ErrAlreadyExist
+			}
+		} else if condition.getFailIfNotExist() {
+			return ErrNotExist
+		}
+	}
+
+	if v, ok := obj.(HasBeforePut); ok {
+		id, err := bucket.NextSequence()
+		if err != nil {
+			return err
+		}
+		v.BeforePut(id)
+	}
+
+	buffer := &bytes.Buffer{}
+	if err := d.getCoder(obj).Encode(buffer, obj); err != nil {
+		return fmt.Errorf("encode %T %q: %w", obj, obj.BoltKey(), err)
+	}
+
+	if err := bucket.Put(obj.BoltKey(), buffer.Bytes()); err != nil {
+		return err
+	}
+
+	return tx.Commit()
+}
+
+// Delete deletes storable object.
+func (d *DB) Delete(obj Storable, conditions ...*Condition) error {
+	var condition *Condition
+	if len(conditions) == 1 {
+		condition = conditions[0]
+	} else if len(conditions) > 1 {
+		return fmt.Errorf("too many conditions")
+	}
+
+	tx, err := d.db.Begin(true)
+	if err != nil {
+		return err
+	}
+	defer rollback(tx)
+
+	bucket := tx.Bucket(obj.BoltBucket())
+	if bucket == nil {
+		if condition.getFailIfNotExist() {
+			return ErrNotExist
+		}
+		return nil
+	}
+	if err := bucket.Delete(obj.BoltKey()); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+// MGet injects storable objects with their keys.
+func (d *DB) MGet(objs ...Storable) error {
 	tx, err := d.db.Begin(false)
 	if err != nil {
 		return err
@@ -61,11 +189,11 @@ func (d *DB) Get(objs ...Storable) error {
 	for _, obj := range objs {
 		bucket := tx.Bucket(obj.BoltBucket())
 		if bucket == nil {
-			return ErrNotFound
+			return ErrNotExist
 		}
 		got := bucket.Get(obj.BoltKey())
 		if got == nil {
-			return ErrNotFound
+			return ErrNotExist
 		}
 		if err := d.getCoder(obj).Decode(bytes.NewReader(got), obj); err != nil {
 			return fmt.Errorf("decode %T %q: %w", obj, obj.BoltKey(), err)
@@ -75,8 +203,8 @@ func (d *DB) Get(objs ...Storable) error {
 	return nil
 }
 
-// Put store storables into database, create bucket if it does not exist.
-func (d *DB) Put(objs ...Storable) error {
+// MPut store storables into database, create bucket if it does not exist.
+func (d *DB) MPut(objs ...Storable) error {
 	tx, err := d.db.Begin(true)
 	if err != nil {
 		return err
@@ -92,12 +220,12 @@ func (d *DB) Put(objs ...Storable) error {
 			}
 		}
 
-		if v, ok := obj.(IdSettable); ok {
+		if v, ok := obj.(HasBeforePut); ok {
 			id, err := bucket.NextSequence()
 			if err != nil {
 				return err
 			}
-			v.SetId(id)
+			v.BeforePut(id)
 		}
 
 		buffer.Reset()
@@ -115,8 +243,8 @@ func (d *DB) Put(objs ...Storable) error {
 	return tx.Commit()
 }
 
-// Delete remove values by key of storables
-func (d *DB) Delete(objs ...Storable) error {
+// MDelete remove values by key of storables
+func (d *DB) MDelete(objs ...Storable) error {
 	tx, err := d.db.Begin(true)
 	if err != nil {
 		return err
@@ -136,7 +264,14 @@ func (d *DB) Delete(objs ...Storable) error {
 }
 
 // Scan scans values in the bucket and put them into result.
-func (d *DB) Scan(result any, cond *Condition) error {
+func (d *DB) Scan(result any, filters ...*Filter) error {
+	var filter *Filter
+	if len(filters) == 1 {
+		filter = filters[0]
+	} else if len(filters) > 1 {
+		return fmt.Errorf("too many filters")
+	}
+
 	if reflect.TypeOf(result).Kind() != reflect.Ptr {
 		return fmt.Errorf("should be slice pointer: %T", result)
 	}
@@ -178,12 +313,12 @@ func (d *DB) Scan(result any, cond *Condition) error {
 	}
 
 	cur := bucket.Cursor()
-	if seek := cond.seek(); seek != nil {
+	if seek := filter.seek(); seek != nil {
 		cur.Seek(seek)
 	}
 SCAN:
-	for k, v := cur.First(); cond.goon(k); k, v = cur.Next() {
-		for _, c := range cond.getConditions() {
+	for k, v := cur.First(); filter.goon(k); k, v = cur.Next() {
+		for _, c := range filter.getConditions() {
 			if c == nil {
 				continue
 			}
@@ -201,7 +336,7 @@ SCAN:
 			return fmt.Errorf("decode %T %q: %w", obj, k, err)
 		}
 
-		for _, c := range cond.getStorableConditions() {
+		for _, c := range filter.getStorableConditions() {
 			if c == nil {
 				continue
 			}
@@ -221,7 +356,14 @@ SCAN:
 }
 
 // First injects the first value in the bucket into result.
-func (d *DB) First(obj Storable, cond *Condition) error {
+func (d *DB) First(obj Storable, filters ...*Filter) error {
+	var filter *Filter
+	if len(filters) == 1 {
+		filter = filters[0]
+	} else if len(filters) > 1 {
+		return fmt.Errorf("too many filters")
+	}
+
 	tx, err := d.db.Begin(false)
 	if err != nil {
 		return err
@@ -234,12 +376,12 @@ func (d *DB) First(obj Storable, cond *Condition) error {
 	}
 
 	cur := bucket.Cursor()
-	if seek := cond.seek(); seek != nil {
+	if seek := filter.seek(); seek != nil {
 		cur.Seek(seek)
 	}
 SCAN:
-	for k, v := cur.First(); cond.goon(k); k, v = cur.Next() {
-		for _, c := range cond.getConditions() {
+	for k, v := cur.First(); filter.goon(k); k, v = cur.Next() {
+		for _, c := range filter.getConditions() {
 			if c == nil {
 				continue
 			}
@@ -254,7 +396,7 @@ SCAN:
 		if err := d.getCoder(obj).Decode(bytes.NewReader(v), obj); err != nil {
 			return fmt.Errorf("decode %T %q: %w", obj, k, err)
 		}
-		for _, c := range cond.getStorableConditions() {
+		for _, c := range filter.getStorableConditions() {
 			if c == nil {
 				continue
 			}
@@ -268,11 +410,18 @@ SCAN:
 		}
 		return nil
 	}
-	return ErrNotFound
+	return ErrNotExist
 }
 
 // Count return count of kv in the bucket.
-func (d *DB) Count(obj Storable, cond *Condition) (int, error) {
+func (d *DB) Count(obj Storable, filters ...*Filter) (int, error) {
+	var filter *Filter
+	if len(filters) == 1 {
+		filter = filters[0]
+	} else if len(filters) > 1 {
+		return 0, fmt.Errorf("too many filters")
+	}
+
 	tx, err := d.db.Begin(false)
 	if err != nil {
 		return 0, err
@@ -286,12 +435,12 @@ func (d *DB) Count(obj Storable, cond *Condition) (int, error) {
 
 	count := 0
 	cur := bucket.Cursor()
-	if seek := cond.seek(); seek != nil {
+	if seek := filter.seek(); seek != nil {
 		cur.Seek(seek)
 	}
 SCAN:
-	for k, v := cur.First(); cond.goon(k); k, v = cur.Next() {
-		for _, c := range cond.getConditions() {
+	for k, v := cur.First(); filter.goon(k); k, v = cur.Next() {
+		for _, c := range filter.getConditions() {
 			if c == nil {
 				continue
 			}
@@ -303,11 +452,11 @@ SCAN:
 				continue SCAN
 			}
 		}
-		if len(cond.getStorableConditions()) > 0 {
+		if len(filter.getStorableConditions()) > 0 {
 			if err := d.getCoder(obj).Decode(bytes.NewReader(v), obj); err != nil {
 				return 0, fmt.Errorf("decode %T %q: %w", obj, k, err)
 			}
-			for _, c := range cond.getStorableConditions() {
+			for _, c := range filter.getStorableConditions() {
 				if c == nil {
 					continue
 				}

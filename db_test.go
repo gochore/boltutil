@@ -15,7 +15,7 @@ func testDB(t *testing.T, empty ...bool) *DB {
 	if len(empty) > 0 && empty[0] {
 		return db
 	}
-	_ = db.Put(
+	_ = db.MPut(
 		&Person{
 			Id:   "jason",
 			Name: "Jason Song",
@@ -204,8 +204,8 @@ func TestDB_Get(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := testDB(t).Get(tt.args.objs...); (err != nil) != tt.wantErr {
-				t.Errorf("Get() error = %v, wantErr %v", err, tt.wantErr)
+			if err := testDB(t).MGet(tt.args.objs...); (err != nil) != tt.wantErr {
+				t.Errorf("MGet() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
@@ -214,7 +214,7 @@ func TestDB_Get(t *testing.T) {
 func TestDB_Scan(t *testing.T) {
 	type args struct {
 		result any
-		cond   *Condition
+		cond   *Filter
 	}
 	tests := []struct {
 		name    string
@@ -335,8 +335,8 @@ func TestDB_Put(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := testDB(t, true).Put(tt.args.storables...); (err != nil) != tt.wantErr {
-				t.Errorf("Put() error = %v, wantErr %v", err, tt.wantErr)
+			if err := testDB(t, true).MPut(tt.args.storables...); (err != nil) != tt.wantErr {
+				t.Errorf("MPut() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
@@ -374,8 +374,8 @@ func TestDB_Delete(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := testDB(t).Delete(tt.args.storables...); (err != nil) != tt.wantErr {
-				t.Errorf("Delete() error = %v, wantErr %v", err, tt.wantErr)
+			if err := testDB(t).MDelete(tt.args.storables...); (err != nil) != tt.wantErr {
+				t.Errorf("MDelete() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
@@ -480,10 +480,10 @@ func TestDB_Count(t *testing.T) {
 	}
 }
 
-func TestDB_SetId(t *testing.T) {
+func TestDB_BeforePut(t *testing.T) {
 	t.Run("set id", func(t *testing.T) {
 		db := testDB(t, true)
-		require.NoError(t, db.Put(&Car{
+		require.NoError(t, db.MPut(&Car{
 			Id:        0,
 			Name:      "test",
 			CreatedAt: time.Now(),
@@ -491,7 +491,7 @@ func TestDB_SetId(t *testing.T) {
 		car := &Car{
 			Id: 1,
 		}
-		require.NoError(t, db.Get(car))
+		require.NoError(t, db.MGet(car))
 		require.Equal(t, uint32(1), car.Id)
 		require.Equal(t, "test", car.Name)
 
