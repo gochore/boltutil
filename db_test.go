@@ -38,7 +38,7 @@ func testDB(t *testing.T, empty ...bool) *DB {
 		CreatedAt: time.Now(),
 	}
 	_ = db.Unwrap().Update(func(tx *bbolt.Tx) error {
-		return tx.Bucket(boom.Bucket()).Put(boom.Key(), []byte("can not decode"))
+		return tx.Bucket(boom.BoltBucket()).Put(boom.BoltKey(), []byte("can not decode"))
 	})
 	return db
 }
@@ -210,9 +210,10 @@ func TestDB_Get(t *testing.T) {
 	}
 }
 
-func TestDB_GetAll(t *testing.T) {
+func TestDB_Scan(t *testing.T) {
 	type args struct {
-		result interface{}
+		result any
+		cond   *Condition
 	}
 	tests := []struct {
 		name    string
@@ -222,7 +223,7 @@ func TestDB_GetAll(t *testing.T) {
 		{
 			name: "regular",
 			args: args{
-				result: func() interface{} {
+				result: func() any {
 					var ret []*Person
 					return &ret
 				}(),
@@ -246,7 +247,7 @@ func TestDB_GetAll(t *testing.T) {
 		{
 			name: "not empty",
 			args: args{
-				result: func() interface{} {
+				result: func() any {
 					ret := make([]*Person, 1)
 					return &ret
 				}(),
@@ -256,7 +257,7 @@ func TestDB_GetAll(t *testing.T) {
 		{
 			name: "wrong item",
 			args: args{
-				result: func() interface{} {
+				result: func() any {
 					var ret []Person
 					return &ret
 				}(),
@@ -266,7 +267,7 @@ func TestDB_GetAll(t *testing.T) {
 		{
 			name: "not storable",
 			args: args{
-				result: func() interface{} {
+				result: func() any {
 					var ret []*string
 					return &ret
 				}(),
@@ -276,7 +277,7 @@ func TestDB_GetAll(t *testing.T) {
 		{
 			name: "bucket not exists",
 			args: args{
-				result: func() interface{} {
+				result: func() any {
 					var ret []*Wind
 					return &ret
 				}(),
@@ -286,7 +287,7 @@ func TestDB_GetAll(t *testing.T) {
 		{
 			name: "can not decode",
 			args: args{
-				result: func() interface{} {
+				result: func() any {
 					var ret []*Car
 					return &ret
 				}(),
@@ -296,8 +297,8 @@ func TestDB_GetAll(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := testDB(t).GetAll(tt.args.result); (err != nil) != tt.wantErr {
-				t.Errorf("GetAll() error = %v, wantErr %v", err, tt.wantErr)
+			if err := testDB(t).Scan(tt.args.result, tt.args.cond); (err != nil) != tt.wantErr {
+				t.Errorf("Scan() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
@@ -439,7 +440,7 @@ func TestDB_DeleteAllBucket(t *testing.T) {
 
 func TestDB_Count(t *testing.T) {
 	type args struct {
-		hasBucket HasBucket
+		obj Storable
 	}
 	tests := []struct {
 		name    string
@@ -450,7 +451,7 @@ func TestDB_Count(t *testing.T) {
 		{
 			name: "regular",
 			args: args{
-				hasBucket: &Person{},
+				obj: &Person{},
 			},
 			want:    2,
 			wantErr: false,
@@ -458,7 +459,7 @@ func TestDB_Count(t *testing.T) {
 		{
 			name: "bucket not exists",
 			args: args{
-				hasBucket: &Wind{},
+				obj: &Wind{},
 			},
 			want:    0,
 			wantErr: false,
@@ -466,7 +467,7 @@ func TestDB_Count(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := testDB(t).Count(tt.args.hasBucket)
+			got, err := testDB(t).Count(tt.args.obj, nil)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Count() error = %v, wantErr %v", err, tt.wantErr)
 				return

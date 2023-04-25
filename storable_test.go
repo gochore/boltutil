@@ -13,11 +13,11 @@ type Person struct {
 	Age  int
 }
 
-func (p *Person) Bucket() []byte {
+func (p *Person) BoltBucket() []byte {
 	return []byte("person")
 }
 
-func (p *Person) Key() []byte {
+func (p *Person) BoltKey() []byte {
 	return []byte(p.Id)
 }
 
@@ -27,27 +27,27 @@ type Car struct {
 	CreatedAt time.Time
 }
 
-func (c *Car) Bucket() []byte {
+func (c *Car) BoltBucket() []byte {
 	return []byte("car")
 }
 
-func (c *Car) Key() []byte {
+func (c *Car) BoltKey() []byte {
 	ret := make([]byte, 4)
 	binary.BigEndian.PutUint32(ret, c.Id)
 	return ret
 }
 
-func (c *Car) Coder() Coder {
+func (c *Car) BoltCoder() Coder {
 	return XmlCoder{}
 }
 
 type Wind struct {
 }
 
-func (c *Wind) Bucket() []byte {
+func (c *Wind) BoltBucket() []byte {
 	return []byte(fmt.Sprintf("%v %v", time.Now(), rand.Int()))
 }
 
-func (c *Wind) Key() []byte {
+func (c *Wind) BoltKey() []byte {
 	return []byte(fmt.Sprintf("%v %v", time.Now(), rand.Int()))
 }
