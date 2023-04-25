@@ -75,8 +75,56 @@ func (d *DB) Get(objs ...Storable) error {
 	return nil
 }
 
-// GetAll injects all storable objects in the bucket.
-func (d *DB) GetAll(result any) error {
+// Put store storables into database, create bucket if it does not exist.
+func (d *DB) Put(objs ...Storable) error {
+	tx, err := d.db.Begin(true)
+	if err != nil {
+		return err
+	}
+	defer rollback(tx)
+
+	for _, obj := range objs {
+		buffer := &bytes.Buffer{}
+		if err := d.getCoder(obj).Encode(buffer, obj); err != nil {
+			return fmt.Errorf("encode %T %q: %w", obj, obj.BoltKey(), err)
+		}
+
+		bucket := tx.Bucket(obj.BoltBucket())
+		if bucket == nil {
+			if bucket, err = tx.CreateBucketIfNotExists(obj.BoltBucket()); err != nil {
+				return err
+			}
+		}
+		if err := bucket.Put(obj.BoltKey(), buffer.Bytes()); err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit()
+}
+
+// Delete remove values by key of storables
+func (d *DB) Delete(objs ...Storable) error {
+	tx, err := d.db.Begin(true)
+	if err != nil {
+		return err
+	}
+	defer rollback(tx)
+
+	for _, obj := range objs {
+		bucket := tx.Bucket(obj.BoltBucket())
+		if bucket == nil {
+			continue
+		}
+		if err := bucket.Delete(obj.BoltKey()); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+// Scan scans values in the bucket and put them into result.
+func (d *DB) Scan(prefixOrRange any, result any) error {
 	if reflect.TypeOf(result).Kind() != reflect.Ptr {
 		return fmt.Errorf("should be slice pointer: %T", result)
 	}
@@ -106,6 +154,26 @@ func (d *DB) GetAll(result any) error {
 		return fmt.Errorf("item should implement Storable: %T", item)
 	}
 
+	var (
+		min []byte
+		check func([]byte) bool
+	)
+	if key, ok := getKey(prefixOrRange); ok {
+		min = key
+		check = func(k []byte) bool {
+			return bytes.HasPrefix(k, min)
+		}
+	} else r, ok := prefixOrRange.(Range); ok {
+		min = r.Min
+		max := r.Max
+		check = func(k []byte) bool {
+			return bytes.Compare(k, min) >= 0 && bytes.Compare(k, max) < 0
+		}
+	}
+
+	}
+
+
 	tx, err := d.db.Begin(false)
 	if err != nil {
 		return err
@@ -118,7 +186,8 @@ func (d *DB) GetAll(result any) error {
 	}
 
 	cur := bucket.Cursor()
-	for k, v := cur.First(); k != nil; k, v = cur.Next() {
+	cur.Seek(prefix)
+	for k, v := cur.First(); k != nil && bytes.HasPrefix(k, prefix); k, v = cur.Next() {
 		obj := reflect.New(itemType).Interface()
 		if err := coder.Decode(bytes.NewBuffer(v), obj); err != nil {
 			return fmt.Errorf("decode %T %q: %w", obj, k, err)
@@ -130,14 +199,14 @@ func (d *DB) GetAll(result any) error {
 }
 
 // Count return count of kv in the bucket.
-func (d *DB) Count(hasBucket HasBucket) (int, error) {
+func (d *DB) Count(obj HasBucket) (int, error) {
 	tx, err := d.db.Begin(false)
 	if err != nil {
 		return 0, err
 	}
 	defer rollback(tx)
 
-	bucket := tx.Bucket(hasBucket.BoltBucket())
+	bucket := tx.Bucket(obj.BoltBucket())
 	if bucket == nil {
 		return 0, nil
 	}
@@ -148,54 +217,6 @@ func (d *DB) Count(hasBucket HasBucket) (int, error) {
 		ret++
 	}
 	return ret, nil
-}
-
-// Put store storables into database, create bucket if it does not exist.
-func (d *DB) Put(storables ...Storable) error {
-	tx, err := d.db.Begin(true)
-	if err != nil {
-		return err
-	}
-	defer rollback(tx)
-
-	for _, obj := range storables {
-		buffer := &bytes.Buffer{}
-		if err := d.getCoder(obj).Encode(buffer, obj); err != nil {
-			return fmt.Errorf("encode %T %q: %w", obj, obj.BoltKey(), err)
-		}
-
-		bucket := tx.Bucket(obj.BoltBucket())
-		if bucket == nil {
-			if bucket, err = tx.CreateBucketIfNotExists(obj.BoltBucket()); err != nil {
-				return err
-			}
-		}
-		if err := bucket.Put(obj.BoltKey(), buffer.Bytes()); err != nil {
-			return err
-		}
-	}
-
-	return tx.Commit()
-}
-
-// Delete remove values by key of storables
-func (d *DB) Delete(storables ...Storable) error {
-	tx, err := d.db.Begin(true)
-	if err != nil {
-		return err
-	}
-	defer rollback(tx)
-
-	for _, obj := range storables {
-		bucket := tx.Bucket(obj.BoltBucket())
-		if bucket == nil {
-			continue
-		}
-		if err := bucket.Delete(obj.BoltKey()); err != nil {
-			return err
-		}
-	}
-	return tx.Commit()
 }
 
 // Exist check if the storable exist
@@ -212,28 +233,6 @@ func (d *DB) Exist(obj Storable) (bool, error) {
 	}
 	got := bucket.Get(obj.BoltKey())
 	return got != nil, nil
-}
-
-// Scan scans the storable
-func (d *DB) Scan(obj Storable, start []byte, f func(obj Storable) bool) error {
-	tx, err := d.db.Begin(false)
-	if err != nil {
-		return err
-	}
-	defer rollback(tx)
-
-	c := tx.Bucket(obj.BoltBucket()).Cursor()
-
-	for k, v := c.Seek(start); k != nil; k, v = c.Next() {
-		if err := d.getCoder(obj).Decode(bytes.NewReader(v), obj); err != nil {
-			return fmt.Errorf("decode %T %q: %w", obj, k, err)
-		}
-		if f != nil && !f(obj) {
-			return nil
-		}
-	}
-
-	return nil
 }
 
 // DeleteBucket remove the specified buckets
