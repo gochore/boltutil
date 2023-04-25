@@ -136,7 +136,14 @@ func (d *DB) Delete(objs ...Storable) error {
 }
 
 // Scan scans values in the bucket and put them into result.
-func (d *DB) Scan(result any, cond *Condition) error {
+func (d *DB) Scan(result any, condition ...*Condition) error {
+	var cond *Condition
+	if len(condition) == 1 {
+		cond = condition[0]
+	} else if len(condition) > 1 {
+		return fmt.Errorf("too many conditions")
+	}
+
 	if reflect.TypeOf(result).Kind() != reflect.Ptr {
 		return fmt.Errorf("should be slice pointer: %T", result)
 	}
@@ -221,7 +228,14 @@ SCAN:
 }
 
 // First injects the first value in the bucket into result.
-func (d *DB) First(obj Storable, cond *Condition) error {
+func (d *DB) First(obj Storable, condition ...*Condition) error {
+	var cond *Condition
+	if len(condition) == 1 {
+		cond = condition[0]
+	} else if len(condition) > 1 {
+		return fmt.Errorf("too many conditions")
+	}
+
 	tx, err := d.db.Begin(false)
 	if err != nil {
 		return err
@@ -272,7 +286,14 @@ SCAN:
 }
 
 // Count return count of kv in the bucket.
-func (d *DB) Count(obj Storable, cond *Condition) (int, error) {
+func (d *DB) Count(obj Storable, condition ...*Condition) (int, error) {
+	var cond *Condition
+	if len(condition) == 1 {
+		cond = condition[0]
+	} else if len(condition) > 1 {
+		return 0, fmt.Errorf("too many conditions")
+	}
+
 	tx, err := d.db.Begin(false)
 	if err != nil {
 		return 0, err
