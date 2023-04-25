@@ -480,7 +480,7 @@ func TestDB_Count(t *testing.T) {
 	}
 }
 
-func TestDB_SetId(t *testing.T) {
+func TestDB_BeforePut(t *testing.T) {
 	t.Run("set id", func(t *testing.T) {
 		db := testDB(t, true)
 		require.NoError(t, db.MPut(&Car{

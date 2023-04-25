@@ -41,7 +41,7 @@ func (c *Car) BoltCoder() Coder {
 	return XmlCoder{}
 }
 
-func (c *Car) SetId(id uint64) {
+func (c *Car) BeforePut(id uint64) {
 	if c.Id == 0 {
 		c.Id = uint32(id)
 	}
