@@ -67,7 +67,7 @@ func (d *DB) Get(objs ...Storable) error {
 		if got == nil {
 			return ErrNotFound
 		}
-		if err := d.getCoder(obj).Decode(bytes.NewBuffer(got), obj); err != nil {
+		if err := d.getCoder(obj).Decode(bytes.NewReader(got), obj); err != nil {
 			return fmt.Errorf("decode %T %q: %w", obj, obj.BoltKey(), err)
 		}
 	}
@@ -105,7 +105,9 @@ func (d *DB) Put(objs ...Storable) error {
 			return fmt.Errorf("encode %T %q: %w", obj, obj.BoltKey(), err)
 		}
 
-		if err := bucket.Put(obj.BoltKey(), buffer.Bytes()); err != nil {
+		value := make([]byte, buffer.Len())
+		copy(value, buffer.Bytes())
+		if err := bucket.Put(obj.BoltKey(), value); err != nil {
 			return err
 		}
 	}
@@ -195,7 +197,7 @@ SCAN:
 		}
 
 		obj := reflect.New(itemType).Interface()
-		if err := coder.Decode(bytes.NewBuffer(v), obj); err != nil {
+		if err := coder.Decode(bytes.NewReader(v), obj); err != nil {
 			return fmt.Errorf("decode %T %q: %w", obj, k, err)
 		}
 
@@ -249,7 +251,7 @@ SCAN:
 				continue SCAN
 			}
 		}
-		if err := d.getCoder(obj).Decode(bytes.NewBuffer(v), obj); err != nil {
+		if err := d.getCoder(obj).Decode(bytes.NewReader(v), obj); err != nil {
 			return fmt.Errorf("decode %T %q: %w", obj, k, err)
 		}
 		for _, c := range cond.getStorableConditions() {
@@ -302,7 +304,7 @@ SCAN:
 			}
 		}
 		if len(cond.getStorableConditions()) > 0 {
-			if err := d.getCoder(obj).Decode(bytes.NewBuffer(v), obj); err != nil {
+			if err := d.getCoder(obj).Decode(bytes.NewReader(v), obj); err != nil {
 				return 0, fmt.Errorf("decode %T %q: %w", obj, k, err)
 			}
 			for _, c := range cond.getStorableConditions() {
