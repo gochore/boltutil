@@ -50,8 +50,8 @@ func (d *DB) Unwrap() *bbolt.DB {
 	return d.db
 }
 
-// Get injects storable objects with their keys.
-func (d *DB) Get(objs ...Storable) error {
+// MGet injects storable objects with their keys.
+func (d *DB) MGet(objs ...Storable) error {
 	tx, err := d.db.Begin(false)
 	if err != nil {
 		return err
@@ -75,8 +75,8 @@ func (d *DB) Get(objs ...Storable) error {
 	return nil
 }
 
-// Put store storables into database, create bucket if it does not exist.
-func (d *DB) Put(objs ...Storable) error {
+// MPut store storables into database, create bucket if it does not exist.
+func (d *DB) MPut(objs ...Storable) error {
 	tx, err := d.db.Begin(true)
 	if err != nil {
 		return err
@@ -115,8 +115,8 @@ func (d *DB) Put(objs ...Storable) error {
 	return tx.Commit()
 }
 
-// Delete remove values by key of storables
-func (d *DB) Delete(objs ...Storable) error {
+// MDelete remove values by key of storables
+func (d *DB) MDelete(objs ...Storable) error {
 	tx, err := d.db.Begin(true)
 	if err != nil {
 		return err
