@@ -83,18 +83,28 @@ func (d *DB) Put(objs ...Storable) error {
 	}
 	defer rollback(tx)
 
+	buffer := &bytes.Buffer{}
 	for _, obj := range objs {
-		buffer := &bytes.Buffer{}
-		if err := d.getCoder(obj).Encode(buffer, obj); err != nil {
-			return fmt.Errorf("encode %T %q: %w", obj, obj.BoltKey(), err)
-		}
-
 		bucket := tx.Bucket(obj.BoltBucket())
 		if bucket == nil {
 			if bucket, err = tx.CreateBucketIfNotExists(obj.BoltBucket()); err != nil {
 				return err
 			}
 		}
+
+		if v, ok := obj.(IdSettable); ok {
+			id, err := bucket.NextSequence()
+			if err != nil {
+				return err
+			}
+			v.SetId(id)
+		}
+
+		buffer.Reset()
+		if err := d.getCoder(obj).Encode(buffer, obj); err != nil {
+			return fmt.Errorf("encode %T %q: %w", obj, obj.BoltKey(), err)
+		}
+
 		if err := bucket.Put(obj.BoltKey(), buffer.Bytes()); err != nil {
 			return err
 		}
